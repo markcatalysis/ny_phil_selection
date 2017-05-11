@@ -4,10 +4,14 @@ import json
 import pymongo
 from copy import copy
 import datetime
-import collections import Counter
+from collections import Counter
 from bson.son import SON
 import pprint
-
+from pandas.tools.plotting import scatter_matrix
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LinearRegression
 '''
 I've recently gotten into the McElroy brothers' media, so expect commenting to reflect that such as soft humor including "good good boy" and other catch phrases.
 '''
@@ -77,6 +81,7 @@ Create works and concert event dataframes instead of program dataframe. concert_
 '''
 
 works_df=pd.io.json.json_normalize(complete_list, 'works', ['concerts','orchestra','programID', 'season'])
+'QUINTET' in works_df.iloc[2].workTitle
 concert_date_df=pd.io.json.json_normalize(complete_list, 'concerts', ['works','orchestra','programID', 'season'])
 
 '''
@@ -90,6 +95,9 @@ nyc_df.drop(['Drop1','Drop2','Drop3'], axis=1, inplace=True)
 nyc_df['Date']=pd.to_datetime(nyc_df['Date'])
 nyc_df=nyc_df.set_index('Date')
 
+'''Adding columns for cei data set back to 6 months to account for lag in response to data'''
+nyc_df['New York -12']=nyc_df['New York'].shift(-12)
+nyc_df['NYC -12']=nyc_df['NYC'].shift(-12)
 '''
 We can now use this dataframe to populate columns that can act as labels or features for the concert data.
 
@@ -97,25 +105,23 @@ I will now create the following simple features based on concert_date_df to comp
 '''
 
 cd_df=copy(concert_date_df)
-cd_df.columns
 cd_df['Date']=pd.to_datetime(cd_df['Date'])
-cd_df['Date'][0].month
-unicorn
-# Make list/column for cd_df for matching year and month filled with NYC and New York DataFrame
 
+
+'''Making column for cd_df for corresponding NYC and New York cei data.'''
 for i, date in enumerate(nyc_df.index):
     cd_df.loc[(cd_df['Date'].dt.year==date.year) & (cd_df['Date'].dt.month==date.month), 'nyc_cei']=nyc_df['NYC'][i]
     cd_df.loc[(cd_df['Date'].dt.year==date.year) & (cd_df['Date'].dt.month==date.month), 'new_york_state_cei']=nyc_df['New York'][i]
-
+    cd_df.loc[(cd_df['Date'].dt.year==date.year) & (cd_df['Date'].dt.month==date.month), 'nyc_cei_12m']=nyc_df['NYC -12'][i]
+    cd_df.loc[(cd_df['Date'].dt.year==date.year) & (cd_df['Date'].dt.month==date.month), 'new_york_state_cei_12m']=nyc_df['New York -12'][i]
 concert_with_cei_df = cd_df[cd_df['nyc_cei'].notnull()]
 '''Adding works length as column as per previously prescribed'''
 concert_with_cei_df['num_works']=[len(x) for x in concert_with_cei_df['works']]
-
 '''The concert_with_cei_df will be further modified with count of top 100 composer in program and fraction of 100 composers in works'''
 
 def composers_in_list(works):
     '''
-    checks if a selected item is in this list of top composers as derived above
+    checks if a selected item is in this list of top composers as derived above. works is a list of dictionaries each representing the data for a particular piece of music within the program.
     '''
     count=0
     works_length=len(works)
@@ -123,6 +129,59 @@ def composers_in_list(works):
         if 'composerName' in x.keys():
             if x['composerName'] in top_100_composers:
                 count+=1
-    return count,count/float(works_length)
+    if works_length>0:
+        return count,count/float(works_length)
+    else:
+        return 0,0
 
-# composers_in_list(concert_with_cei_df['works'][11156])
+top_10_composers=top_100_composers=[x['_id'] for x in top_composers[1:11]]
+
+def composers_in_10_list(works):
+    '''
+    checks if a selected item is in this list of top composers as derived above. works is a list of dictionaries each representing the data for a particular piece of music within the program.
+    '''
+    count=0
+    works_length=len(works)
+    for x in works:
+        if 'composerName' in x.keys():
+            if x['composerName'] in top_10_composers:
+                count+=1
+    if works_length>0:
+        return count,count/float(works_length)
+    else:
+        return 0,0
+
+concert_with_cei_df['top_composer_count']=[composers_in_list(x)[0] for x in concert_with_cei_df['works']]
+concert_with_cei_df['top_composer_fract']=[composers_in_list(x)[1] for x in concert_with_cei_df['works']]
+concert_with_cei_df['top_10_composer_count']=[composers_in_10_list(x)[0] for x in concert_with_cei_df['works']]
+concert_with_cei_df['top_10_composer_fract']=[composers_in_10_list(x)[1] for x in concert_with_cei_df['works']]
+'''composer based columns added'''
+
+"""let's inspect this df a bit. will rename it into something more wieldy."""
+big_df=copy(concert_with_cei_df)
+big_df=big_df.drop(['Location', 'Time','Venue', 'eventType','season','programID','works','orchestra'], axis=1)
+sm=scatter_matrix(big_df, diagonal='kde', figsize=(6, 6), alpha=.2)
+plt.tight_layout
+[s.xaxis.label.set_rotation(45) for s in sm.reshape(-1)]
+[s.yaxis.label.set_rotation(45) for s in sm.reshape(-1)]
+[s.get_yaxis().set_label_coords(-0.3,0.5) for s in sm.reshape(-1)]
+[s.set_xticks(()) for s in sm.reshape(-1)]
+[s.set_yticks(()) for s in sm.reshape(-1)]
+plt.show()
+
+X=big_df[['top_composer_fract', 'top_composer_count', 'top_10_composer_fract', 'top_10_composer_count',t'num_works']].fillna(value=0)
+y=big_df[['nyc_cei_12m']].fillna(value=0)
+
+X_train,X_test,y_train,y_test=train_test_split(X,y)
+lr=LinearRegression()
+lr.fit(X_train,y_train)
+rf.score(X_test,y_test)
+'''
+Score was ~0.008 R^2. Pretty rough.
+
+We're going to engineer more features! Contains small pieces: concerto, quartet, quintet, trio, duo. No idea if those are in there but we'll build a function for it. Also will generate a function for top 10 composers only. Result of top 10... nearly no gain in signal. Maybe no signal? Interesting. 
+'''
+
+
+# works_df=pd.io.json.json_normalize(complete_list, 'works', ['concerts','orchestra','programID', 'season'])
+# 'QUINTET' in works_df.iloc[2].workTitle
