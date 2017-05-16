@@ -17,3 +17,7 @@ https://www.newyorkfed.org/research/regional_economy/coincident_summary.html
 With these as labels we hope to be able to find the indirect relationship between external economic factors on the choice of programs.
 
 I have engineered some additional features from the data and continue to do so. After some initial linear regression scoring, which has revealed a very low correlation between the number of most frequent composers and CEI data, more relevant features such as those indicating smaller orchestras (eg: keywords of CONCERTO and QUARTET). I will be looking for additional economic data and budgetary information.
+
+# Project Redirect
+
+The ultimate goal of this project was to evaluate the choices made for the NYPhil based on external economic influences. As such, I am reshaping the data to create a more useful label that evaluates a program by unconventionality of the program works. Penalized are composers and pieces that regularly appear. This processed value will be indexed by date of the first concert for the program. This will be evaluated with exogenous featurized economics data pulled from various sources that will be listed here later once I have chosen the most relevant datasets. Included so far are the NY City and State CEI as previously described but also stock market indices.  
