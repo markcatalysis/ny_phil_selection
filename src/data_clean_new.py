@@ -9,7 +9,7 @@ import datetime
 from bson.son import SON
 
 class data_clean(object):
-    def __init__():
+    def __init__(self):
         self.works_dict={}
         self.composers_dict={}
         self.complete_df=pd.read_json('../data/complete.json')
@@ -18,7 +18,7 @@ class data_clean(object):
         self._programs_db=self._client.programs_database
         self.works_max=0
         self.composers_max=0
-        self.run
+        self.programs_df=[]
 
     # def populate_mongodb(self):
     #     '''below code used to populate database'''
@@ -28,53 +28,64 @@ class data_clean(object):
     def run(self):
         self.get_composers()
         self.get_works()
-        self.composers_max=np.max(self.composers_dict.values)
-        self.works_max=np.max(self.works_dict.values)
+        self.create_programs_dataframe()
 
     def get_composers(self):
-        '''
+        """
         Creates a dict of composers and counts from mongodb
-        '''
+
+        Note: drops first element in temporary list which is always Composer: None, WorkTitle: None.
+        """
         pipeline=[{"$unwind": "$works"},{"$group": {"_id": "$works.composerName", "count": {"$sum": 1}}},{"$sort": SON([("count", -1), ("_id", -1)])}]
-        temp_list=list(self._programs_db.programs.aggregate(pipeline))
-        self.composers_dict={x[0]['_id']:x[1]['count'] for x in temp_list}
+        temp_list=list(self._programs_db.programs.aggregate(pipeline))[1:]
+        self.composers_max=temp_list[0]['count']
+        self.composers_dict={x['_id']:x['count'] for x in temp_list}
 
     def get_works(self):
-        '''
+        """
         Creates a dict of works and counts from mongodb
-        '''
+
+        Note: drops first element in temporary list which is always Composer: None, WorkTitle: None.
+        """
         pipeline=[{"$unwind": "$works"},{"$group": {"_id": "$works.workTitle", "count": {"$sum": 1}}},{"$sort": SON([("count", -1), ("_id", -1)])}]
-        temp_list=list(self._programs_db.programs.aggregate(pipeline))
-        self.works_dict={x[0]['_id']:x[1]['count'] for x in temp_list}
+        temp_list=list(self._programs_db.programs.aggregate(pipeline))[1:]
+        self.works_max=temp_list[0]['count']
+        temp_dict={}
+        for x in temp_list:
+            if type(x['_id'])==unicode:
+                k,v=x['_id'], x['count']
+                temp_dict[k]=v
+        self.works_dict=temp_dict
 
     def composer_unconventionality(self, composer):
-        '''
+        """
         Input: Str or Unicode, Dictionary
         Output: Integer, 1/composer count * max composer count
         Takes in the output from get_composers after it's been transformed into a dictionary for the given composers as keys
-        '''
-        return self.composers_max/float(composers_dict['composer'])
+        """
+        return 1/float(self.composers_dict[composer])
 
-    def worktitle_unconventionality(self, worktitle):
-        '''
+    def worktitle_unconventionality(self, workTitle):
+        """
         Input: Str or Unicode, Dictionary
         Output: Integer, 1/worktitle count * max worktitle count
         Takes in the output from get_works after it's been transformed into a dictionary for the given works as keys
-        '''
-        if works_dict=None:
-            works_dict=self.works_dict
-        return self.works_max/float(works_dict['worktitle'])
+        """
+        if type(workTitle)==unicode:
+            return 1/float(self.works_dict[workTitle])
+        else:
+            return 1
 
     def unconventionality(self, works_list_from_programs):
-        '''
+        """
         Input: List
         Output: Int
         Takes in a list of dictionaries for a particular philharmonic program and calculates the unconventionality as defined by worktitle_unconventionality*composer_unconventionality
-        '''
+        """
         unconventionality_list=[]
-        for x in works_list:
-            if 'workTitle' in x.keys() and 'composerName' in x.keys:
-                unconventionality_list.append(worktitle_unconventionality(x['workTitle'])*composer_unconventionality(x['composerName']))
+        for x in works_list_from_programs:
+            if ('workTitle' in x.keys()) and ('composerName' in x.keys()):
+                unconventionality_list.append(self.worktitle_unconventionality(x['workTitle'])*self.composer_unconventionality(x['composerName']))
         if len(unconventionality_list)>0:
             return np.mean(unconventionality_list)
         else:
@@ -82,15 +93,19 @@ class data_clean(object):
 
 
     def create_programs_dataframe(self):
-        '''
+        """
         Output processed dataframes. Each row corresponds to a program or season. Uses first concert date as representive date for program.
-        '''
-        programs_df=pd.io.json.json_normalize(self.complete_list, 'program_ID', ['concerts','works','orchestra', 'season']).set_index('programID')
-        programs_df['unconventionality']=[unconventionality(works_list) for works_list in programs_df['works']]
+        """
+        programs_df=pd.DataFrame(self.complete_list)
+        programs_df['unconventionality']=[self.unconventionality(works_list) for works_list in programs_df['works']]
         # season_df=pd.io.json.json_normalize(self.complete_list, 'season', ['works','orchestra','programID', 'season']).set_index('season')
         # season_df['unconventionality']=[unconventionality(works_list) for works_list in programs_df['works']]
-        programs_df['Date']=pd.to_datetime(programs_df['concerts'].iloc[0]['Date'])
-        return programs_df
+        programs_df['Date']=[x[0]['Date'] for x in programs_df['concerts']]
+        programs_df['Date']=pd.to_datetime(programs_df['Date'])
+        self.programs_df = programs_df
+
+    def df(self):
+        return self.programs_df.drop(['concerts', 'orchestra','id','programID','works'], axis=1)
 
 
 
