@@ -102,12 +102,56 @@ class data_clean(object):
         # season_df['unconventionality']=[unconventionality(works_list) for works_list in programs_df['works']]
         programs_df['Date']=[x[0]['Date'] for x in programs_df['concerts']]
         programs_df['Date']=pd.to_datetime(programs_df['Date'])
+        programs_df=programs_df.join(programs_df.groupby('season').mean(), how='outer', on='season', lsuffix='_by_program', rsuffix='_by_season')
         self.programs_df = programs_df
 
     def df(self):
         return self.programs_df.drop(['concerts', 'orchestra','id','programID','works'], axis=1)
 
+class econ_data(object):
+    '''
+    Load econ data. Considering removing dowjones and sp500 as data only stretches back to 2007. I realize this is hardcoding these imports but each data source requires its own special treatment.
+    '''
+    def __init__(self):
+        self.cei=[]
+        self.acpsa=[]
+        self.nasdaq=[]
+        self.volatility_index=[]
+        self.dowjones=[]
+        self.sp500=[]
+        self.data_matrix=[]
 
+    def load_econ_data(self):
+        # monthly Coincident Economic Index data
+        self.cei=pd.read_csv('../data/nyc_cei.txt', header=0, names=['DATE','New York', 'New Jersey', 'NYC','Drop1','Drop2','Drop3'], delim_whitespace=True)
+        self.cei.drop(['Drop1','Drop2','Drop3','New Jersey'], axis=1, inplace=True)
+        self.cei['DATE']=pd.to_datetime(self.cei['DATE'])
+
+        # acpsa data by year, Arts and Culture Production Satellite Account
+        temp_acpsa=pd.read_excel('../data/ACPSA-DataForADP.xlsx', sheetname=1)
+        self.acpsa=temp_acpsa[temp_acpsa.where(temp_acpsa['FIPS, State']=='36 New York')['Industry code'].isin([34, 35, 36])]
+        self.acpsa.drop(['FIPS, State', 'Industry name'], axis=1, inplace=True)
+        self.acpsa['DATE']=pd.to_datetime(self.acpsa['Year'])
+
+        # nasdaq and below, daily but varying years covered, fillna will be needed later
+        # NASDAQ, Dow Jones, Standard and Poor's 500, Chicago Board Option Exchange Volatlity Index
+        # data sourced from https://fred.stlouisfed.org/
+        self.nasdaq=pd.read_csv('../data/NASDAQCOM.csv')
+        self.dowjones=pd.read_csv('../data/DJIA.csv')
+        self.sp500=pd.read_csv('../data/SP500.csv')
+        self.volatility_index=pd.read_csv('../data/VIXCLS.csv')
+
+    def make_data_matrix(self):
+        '''
+        Using internal state data pulled from all over to create a full data matrix.
+        '''
+        dfs_to_merge=[self.nasdaq, self.dowjones, self.sp500, self.volatility_index, self.acpsa, self.cei]
+        mergedf=dfs_to_merge.pop(0)
+        for df in dfs_to_merge:
+            mergedf=pd.merge(mergedf, df, how='outer', on=['DATE','DATE'])
+        mergedf['DATE']=pd.to_datetime(mergedf['DATE'])
+        self.data_matrix=mergedf.fillna(method='ffill').fillna(0)
+        self.data_matrix.index=self.data_matrix.set_index('DATE')
 
 # programs_df['Date']=pd.to_datetime(concert_date_df['Date'])
 

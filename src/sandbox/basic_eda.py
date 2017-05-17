@@ -4,7 +4,6 @@ import json
 import pymongo
 from copy import copy
 import datetime
-from collections import Counter
 from bson.son import SON
 import pprint
 from pandas.tools.plotting import scatter_matrix
@@ -17,7 +16,7 @@ I've recently gotten into the McElroy brothers' media, so expect commenting to r
 '''
 
 complete_df = pd.read_json('../../data/complete.json')
-complete_df.columns
+# complete_df.columns
 complete_list=list(complete_df['programs'])
 c_df=pd.DataFrame(complete_list)
 # c_df.iloc[0]['works']
@@ -81,9 +80,8 @@ Create works and concert event dataframes instead of program dataframe. concert_
 '''
 
 works_df=pd.io.json.json_normalize(complete_list, 'works', ['concerts','orchestra','programID', 'season'])
-'QUINTET' in works_df.iloc[2].workTitle
 concert_date_df=pd.io.json.json_normalize(complete_list, 'concerts', ['works','orchestra','programID', 'season'])
-
+concert_date_df.head()
 '''
 *****************
 Taking a quick EDA detour to see if NYPhil data tracks with economic indicators. This will help me direct my feature engineering regardless. First we bring in a new data source, the nyc_cei.txt, table of three month by month economic indicators in NYC, New Jersey, and NY State.
@@ -106,7 +104,7 @@ I will now create the following simple features based on concert_date_df to comp
 
 cd_df=copy(concert_date_df)
 cd_df['Date']=pd.to_datetime(cd_df['Date'])
-
+cd_df
 
 '''Making column for cd_df for corresponding NYC and New York cei data.'''
 for i, date in enumerate(nyc_df.index):
@@ -134,7 +132,7 @@ def composers_in_list(works):
     else:
         return 0,0
 
-top_10_composers=top_100_composers=[x['_id'] for x in top_composers[1:11]]
+top_10_composers=[x['_id'] for x in top_composers[1:11]]
 
 def composers_in_10_list(works):
     '''
@@ -169,19 +167,38 @@ plt.tight_layout
 [s.set_yticks(()) for s in sm.reshape(-1)]
 plt.show()
 
-X=big_df[['top_composer_fract', 'top_composer_count', 'top_10_composer_fract', 'top_10_composer_count',t'num_works']].fillna(value=0)
-y=big_df[['nyc_cei_12m']].fillna(value=0)
+big_df.columns
+X=big_df[['top_composer_fract', 'top_composer_count', 'top_10_composer_fract', 'top_10_composer_count','num_works']].fillna(value=0)
+X['ones']=np.ones((X.shape[0],1))
+y=big_df[['new_york_state_cei_12m']].fillna(value=0)
 
 X_train,X_test,y_train,y_test=train_test_split(X,y)
 lr=LinearRegression()
 lr.fit(X_train,y_train)
-rf.score(X_test,y_test)
+lr.score(X_test,y_test)
 '''
-Score was ~0.008 R^2. Pretty rough.
+Score was ~0.0008 R^2. Pretty rough.
 
-We're going to engineer more features! Contains small pieces: concerto, quartet, quintet, trio, duo. No idea if those are in there but we'll build a function for it. Also will generate a function for top 10 composers only. Result of top 10... nearly no gain in signal. Maybe no signal? Interesting. 
+We're going to engineer more features! Contains small pieces: concerto, quartet, quintet, trio, duo. No idea if those are in there but we'll build a function for it. Also will generate a function for top 10 composers only. Result of top 10... nearly no gain in signal. Maybe no signal? Interesting.
+
+Score improvement to ~0.0027, which suggest slightly more signal in top 10 but not much. To avoid p-hacking let's focus on non-composer rate features. Composers will be visited again later with regard to dummifying and dropping columns. Don't forget to add column of 1s!
 '''
 
+def smaller_ensembles(works_list):
+    count=0
+    small_ensemble_keyword_list=['QUINTET', 'CONCERTO', 'QUARTET', 'PIANO', 'HARP', 'SOLO', 'DUO', 'ENSEMBLE']
+    works_length=len(works_list)
+    for x in works_list:
+        if 'workTitle' in x.keys():
+            for keyword in small_ensemble_keyword_list:
+                if keyword in x['workTitle']:
+                    count+=1
+    if works_length>0:
+        return count,count/float(works_length)
+    else:
+        return 0,0
+
+[smaller_ensembles(x) for x in concert_with_cei_df['works']]
 
 # works_df=pd.io.json.json_normalize(complete_list, 'works', ['concerts','orchestra','programID', 'season'])
 # 'QUINTET' in works_df.iloc[2].workTitle
