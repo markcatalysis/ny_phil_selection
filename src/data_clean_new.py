@@ -7,6 +7,20 @@ import pymongo
 from copy import copy
 import datetime
 from bson.son import SON
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler
+
+'''
+Notes on Usage:
+
+data_clean object is used to process the ny philharmonic data and produce a y label (treating it as the endogenous variable)
+
+econ_data object is used to process the economics data being brought in. must be tuned for any additional data since there's no easy generic way to intuit relevant dates and values.
+
+fit_the_data() is a function designed as a pipeline for revealing relevant scores. will likely break this off into its own py file.
+'''
 
 class data_clean(object):
     def __init__(self):
@@ -102,11 +116,20 @@ class data_clean(object):
         # season_df['unconventionality']=[unconventionality(works_list) for works_list in programs_df['works']]
         programs_df['Date']=[x[0]['Date'] for x in programs_df['concerts']]
         programs_df['Date']=pd.to_datetime(programs_df['Date'])
+        # programs_df=programs_df.set_index('Date')
         programs_df=programs_df.join(programs_df.groupby('season').mean(), how='outer', on='season', lsuffix='_by_program', rsuffix='_by_season')
         self.programs_df = programs_df
 
     def df(self):
         return self.programs_df.drop(['concerts', 'orchestra','id','programID','works'], axis=1)
+
+    def programs(self):
+        p_df=self.programs_df.drop(['concerts', 'orchestra','id','programID','works'], axis=1)
+        return p_df[['Date', 'unconventionality_by_program']].set_index('Date')
+
+    def seasons(self):
+        p_df=self.programs_df.drop(['concerts', 'orchestra','id','programID','works'], axis=1)
+        return p_df.groupby('season').first().drop('unconventionality_by_program', axis=1).set_index('Date')
 
 class econ_data(object):
     '''
@@ -141,70 +164,79 @@ class econ_data(object):
         self.sp500=pd.read_csv('../data/SP500.csv')
         self.volatility_index=pd.read_csv('../data/VIXCLS.csv')
 
+    def isnumber(self, x):
+        '''
+        Input: element
+        Output: mask for that element
+        '''
+        try:
+            float(x)
+            return True
+        except:
+            return False
+
+
     def make_data_matrix(self):
         '''
         Using internal state data pulled from all over to create a full data matrix.
         '''
-        dfs_to_merge=[self.nasdaq, self.dowjones, self.sp500, self.volatility_index, self.acpsa, self.cei]
+        dfs_to_merge = [self.nasdaq, self.dowjones, self.sp500, self.volatility_index, self.acpsa, self.cei]
         mergedf=dfs_to_merge.pop(0)
         for df in dfs_to_merge:
             mergedf=pd.merge(mergedf, df, how='outer', on=['DATE','DATE'])
         mergedf['DATE']=pd.to_datetime(mergedf['DATE'])
-        self.data_matrix=mergedf.fillna(method='ffill').fillna(0)
-        self.data_matrix.index=self.data_matrix.set_index('DATE')
+        self.data_matrix=mergedf
+        self.data_matrix=self.data_matrix.set_index('DATE')
+        self.data_matrix=self.data_matrix[self.data_matrix.applymap(self.isnumber)].fillna(method='ffill').fillna(0)
 
-# programs_df['Date']=pd.to_datetime(concert_date_df['Date'])
 
-# def create_works_concert_dfs():
-#     '''
-#     Output: two pandas dataframes
-#
-#     Uses existing database to make these dataframes for easier handling. concerts is most useful for extracting dates. works important for extracting musical piece specific features.
-#     '''
-#     works_df=pd.io.json.json_normalize(complete_list, 'works', ['concerts','orchestra','programID', 'season'])
-#     concert_date_df=pd.io.json.json_normalize(complete_list, 'concerts', ['works','orchestra','programID', 'season'])
-#     concert_date_df['Date']=pd.to_datetime(concert_date_df['Date'])
-#     return works_df, concert_date_df
-#
-# def composers_in_list(works, n=10, composers=None):
-#     '''
-#     Input: list of dicts
-#     Ouput: Int, Float, count of people in composers and fraction of those composers in list
-#
-#     checks if a selected item is in this list of top composers as derived above. works is a list of dictionaries each representing the data for a particular piece of music within the program.
-#     '''
-#     if composers is None:
-#         composers = make_top_composers(n)
-#     count=0
-#     works_length=0
-#     for x in works:
-#         if 'composerName' in x.keys():
-#             works_length+=1
-#             if x['composerName'] in composers:
-#                 count+=1
-#     if works_length>0:
-#         return count,count/float(works_length)
-#     else:
-#         return 0,0
-#
-# def works_in_list(works, w=100, works_list=None):
-#     '''
-#     Input: list of dicts
-#     Ouput: Int, Float, count of people in composers and fraction of those composers in list
-#
-#     checks if a selected item is in this list of top composers as derived above. works is a list of dictionaries each representing the data for a particular piece of music within the program.
-#     '''
-#     if works_list is None:
-#         works_list = make_top_works(n)
-#     count=0
-#     works_length=0
-#     for x in works:
-#         if 'workTitle' in x.keys():
-#             works_length+=1
-#             if type(x['workTitle'])==unicode:
-#                 if x['workTitle'] in works_list:
-#                     count+=1
-#     if works_length>0:
-#         return count,count/float(works_length)
-#     else:
-#         return 0,0
+
+def fit_the_data(dc=None, econ=None):
+    '''
+    Input: Object, Object  --  fitted data_clean() and econ_data() class objects. if an input is not supplied, produces it for you.
+    '''
+
+    if dc is None:
+        dc=data_clean()
+        dc.run()
+    if econ is None:
+        econ=econ_data()
+        econ.load_econ_data()
+        econ.make_data_matrix()
+
+    '''
+    reshape relevant X and y data for individual programs and for whole seasons.
+    '''
+
+    X_base_df=econ.data_matrix
+    y_seasons_df=dc.seasons()
+    y_programs_df=dc.programs()
+    X_dates=X_base_df.index.date
+    y_seasons_df.index.date
+
+    for i, date in enumerate(y_seasons_df.index.date):
+        if date in X_dates:
+            X_base_df.loc[X_base_df.index.date==date, 'unconventionality']=y_seasons_df['unconventionality_by_season'][i]
+    X=X_base_df[X_base_df['unconventionality'].notnull()]
+    y=X.pop('unconventionality')
+    # X_seasons=X_base_df[X_base_df['unconventionality'].notnull()]
+    # y_seasons=X_seasons.pop('unconventionality')
+
+    # reset the base dataframe
+    # run for individual programs
+
+    # X_base_df=econ.data_matrix
+    # for i, date in enumerate(y_programs_df.index.date):
+    #     if date in X_dates:
+    #         X_base_df.loc[X_base_df.index.date==date, 'unconventionality']=y_programs_df['unconventionality_by_program'][i]
+    # X_programs=X_base_df[X_base_df['unconventionality'].notnull()]
+    # y_programs=X_programs.pop('unconventionality')
+
+    X['ones']=np.ones(X.shape[0])
+    X=X.reset_index().drop('DATE', axis=1)
+    X=StandardScaler().fit_transform(X)
+    X_train,X_test,y_train,y_test=train_test_split(X,y)
+    lr=LinearRegression()
+    lr.fit(X_train,y_train)
+    return lr.score(X_test,y_test)
+    # return X
