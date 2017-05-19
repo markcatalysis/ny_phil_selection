@@ -7,9 +7,11 @@ import pymongo
 from copy import copy
 import datetime
 from bson.son import SON
-from sklearn.model_selection import train_test_split
+# from sklearn.model_selection import train_test_split
+from sklearn.model_selection import TimeSeriesSplit
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
 '''
@@ -142,6 +144,7 @@ class econ_data(object):
         self.volatility_index=[]
         self.dowjones=[]
         self.sp500=[]
+        self.fedrate=[]
         self.data_matrix=[]
 
     def load_econ_data(self):
@@ -163,6 +166,7 @@ class econ_data(object):
         self.dowjones=pd.read_csv('../data/DJIA.csv')
         self.sp500=pd.read_csv('../data/SP500.csv')
         self.volatility_index=pd.read_csv('../data/VIXCLS.csv')
+        self.fedrate=pd.read_csv('../data/FEDFUNDS.csv')
 
     def isnumber(self, x):
         '''
@@ -178,20 +182,38 @@ class econ_data(object):
 
     def make_data_matrix(self):
         '''
-        Using internal state data pulled from all over to create a full data matrix.
+        Create a full data matrix for econ data.
         '''
-        dfs_to_merge = [self.nasdaq, self.dowjones, self.sp500, self.volatility_index, self.acpsa, self.cei]
+        dfs_to_merge = [self.nasdaq, self.dowjones, self.sp500, self.volatility_index, self.fedrate, self.acpsa, self.cei]
         mergedf=dfs_to_merge.pop(0)
         for df in dfs_to_merge:
             mergedf=pd.merge(mergedf, df, how='outer', on=['DATE','DATE'])
         mergedf['DATE']=pd.to_datetime(mergedf['DATE'])
         self.data_matrix=mergedf
+        self.data_matrix['Days Since Data']=(self.data_matrix['DATE']-self.data_matrix['DATE'].min())/np.timedelta64(1,'D')
         self.data_matrix=self.data_matrix.set_index('DATE')
-        self.data_matrix=self.data_matrix[self.data_matrix.applymap(self.isnumber)].fillna(method='ffill').fillna(0)
+        self.data_matrix=self.data_matrix[self.data_matrix.applymap(self.isnumber)].fillna(method='ffill').fillna(0).convert_objects(convert_dates=False, convert_numeric=True)
+
+    def add_delta_columns(self,d):
+        '''
+        makes columns for data_matrix composed of deltas between the values at a current time and a previous time d days before
+        '''
+        columns=self.data_matrix.columns
+        for column in columns:
+            column_name='%s_delta_%s_days' % (column,d)
+            self.data_matrix[column_name]=self.data_matrix[column].diff(d)
+            self.data_matrix=self.data_matrix.fillna(method='ffill').fillna(0)
+
+
+    # def shift_matrix_data(self,d):
+    #     '''
+    #     Shift back data by days. Only use sparingly so that you don't accidentally overwrite perfectly good data.
+    #     '''
+    #     self.data_matrix=self.data_matrix.shift(-d, axis=1).fillna(method='ffill').fillna(0)
 
 
 
-def fit_the_data(dc=None, econ=None):
+def fit_the_data(d=0, dc=None, econ=None):
     '''
     Input: Object, Object  --  fitted data_clean() and econ_data() class objects. if an input is not supplied, produces it for you.
     '''
@@ -203,6 +225,9 @@ def fit_the_data(dc=None, econ=None):
         econ=econ_data()
         econ.load_econ_data()
         econ.make_data_matrix()
+    # econ.shift_matrix_data(d)
+    if d is not 0 and type(d) is int:
+        econ.add_delta_columns(d)
 
     '''
     reshape relevant X and y data for individual programs and for whole seasons.
@@ -219,6 +244,9 @@ def fit_the_data(dc=None, econ=None):
             X_base_df.loc[X_base_df.index.date==date, 'unconventionality']=y_seasons_df['unconventionality_by_season'][i]
     X=X_base_df[X_base_df['unconventionality'].notnull()]
     y=X.pop('unconventionality')
+
+    #below code is available in case i want to switch back to testing for individul programs instead of whole seasons
+
     # X_seasons=X_base_df[X_base_df['unconventionality'].notnull()]
     # y_seasons=X_seasons.pop('unconventionality')
 
@@ -232,11 +260,58 @@ def fit_the_data(dc=None, econ=None):
     # X_programs=X_base_df[X_base_df['unconventionality'].notnull()]
     # y_programs=X_programs.pop('unconventionality')
 
+    '''Linear Regression'''
     X['ones']=np.ones(X.shape[0])
     X=X.reset_index().drop('DATE', axis=1)
     X=StandardScaler().fit_transform(X)
-    X_train,X_test,y_train,y_test=train_test_split(X,y)
+    # X_train,X_test,y_train,y_test=train_test_split(X,y)
+    # lr=LinearRegression()
+    # lr.fit(X_train,y_train)
+    # lscore = lr.score(X_test, y_test)
+    '''time-series-split instead of shuffle-split'''
+
+    tscv=TimeSeriesSplit(n_splits=50)
+    lscore_list=[]
     lr=LinearRegression()
-    lr.fit(X_train,y_train)
-    return lr.score(X_test,y_test)
+    for train_index, test_index in tscv.split(X):
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+        lr.fit(X_train,y_train)
+        lscore_list.append(lr.score(X_test, y_test))
+    lscore=np.mean(lscore_list[25:])
+
+    '''Logistic Regression'''
+    logr=LogisticRegression()
+    y=y>y.median()
+    # X_train,X_test,y_train,y_test=train_test_split(X,y)
+    # logr.fit(X_train,y_train)
+    # logscore = logr.score(X_test, y_test)
+
+    logscore_list=[]
+    for train_index, test_index in tscv.split(X):
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+        logr.fit(X_train,y_train)
+        logscore_list.append(lr.score(X_test, y_test))
+    logscore=np.mean(logscore_list[25:])
+
+    '''Random Forest'''
+    X=X_base_df[X_base_df['unconventionality'].notnull()]
+    X=X.reset_index().drop('DATE', axis=1)
+    y=X.pop('unconventionality')
+    y=y>y.median()
+    X=X.values
+    rf=RandomForestClassifier()
+    # X_train,X_test,y_train,y_test=train_test_split(X,y)
+    # rf.fit(X_train,y_train)
+    # rscore = rf.score(X_test,y_test)
+
+    rscore_list=[]
+    for train_index, test_index in tscv.split(X):
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+        rf.fit(X_train,y_train)
+        rscore_list.append(rf.score(X_test,y_test))
+    rscore=np.mean(rscore_list[25:])
+    return (lscore,logscore,rscore)
     # return X

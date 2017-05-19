@@ -20,20 +20,22 @@ import datetime
 
 dc=data_clean()
 dc.run()
+dc.seasons().columns[0]
+
 econ=econ_data()
 econ.load_econ_data()
 econ.make_data_matrix()
-
+columns_1=econ.data_matrix.columns
+'%s_%s' % (columns_1[0],2)
 # X_base_df=econ.data_matrix
 # y_seasons_df=dc.seasons()
 # y_programs_df=dc.programs()
 # X_dates=X_base_df.index.date
 # y_seasons_df.index.date
 
-X=fit_the_data()
+print fit_the_data(d=60)
+
 # X.reset_index().drop('DATE', axis=1)
-X
-X.applymap(np.isreal)
 
 # for i, date in enumerate(y_seasons_df.index.date):
 #     if date in X_dates:
