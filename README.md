@@ -1,23 +1,24 @@
 # ny_phil_selection
 
-This README will temporarily serve as a historical explanation of the steps taken in the evolution of this project.
 
-# Initial Concept
+# Motivation
 
-The goal of this project is to track with time the decisions made in compositions and composers as functions of the following features: place of origin of composer, conductor, soloist instruments, and historical events that may have influenced these choices such as avoiding composers from regions at war with the US.
+The goal of this project is to track with time what compositions and composers are chosen for the NY Philharmonic's programs as a function of economic indicators at the local, state, and national levels. The reasoning is as follows. Conductors choose programs that balance personal preference and budgetary constraints. Conventional programs that largely feature crowd favorites like Beethoven and Mozart are more likely to fill seats than more modern or lesser known composers such as Mahler and Shostakovich who  often require larger orchestras for their pieces. During periods of economic downturn, attendance will drop. In order to compensate, program conventionality increases. By tracking economic indicators, one may be able to predict how conventional or unconventional the choice of music will be at the symphony.     
 
-Currently I am using data from https://github.com/nyphilarchive/PerformanceHistory . The basic_eda.py file represents some of the fundamental EDA an reorganization I am performing in order to shape the data into a workable dataset that can be analyzed with standard regression methods and other custom modeling tools.  
+# Data Sources:
 
-# Further Exploration
+I am using publicly available data from https://github.com/nyphilarchive/PerformanceHistory. The sources of the economic indicators are the National Endowment of the Arts  https://www.arts.gov/news/2017/latest-economic-data-tracks-arts-and-cultural-jobs-state, the Federal Reserve https://fred.stlouisfed.org/categories, and the Federal Reserve Bank of New York   https://www.newyorkfed.org/research/regional_economy/coincident_summary.html.
 
-After initial data exploration, I have added outside data collected from the New York Coincident Economic Indicators data located here.
+# Methodology:
 
-https://www.newyorkfed.org/research/regional_economy/coincident_summary.html
+I am focusing primarily on degrees of unconventionality for the program data. In order to measure unconventionality vs economic health I first created a metric to label an individual work's degree of conventionality. Over the whole corpus of the NY Philharmonic dating back to 1842, I counted the total frequency of each unique composer and piece and for each work I gave it an unconventinality of (1/composer frequency)x(1/work frequency). This value yields a maximum of 1 as for a uniquely chosen work. For an individual program I took the mean of conventionality across the program, and for an entire season I took the mean over all its programs.
 
-With these as labels we hope to be able to find the indirect relationship between external economic factors on the choice of programs.
+The economics data spanned only from the early 1970s on with many of the indicators spanning over much shorter periods. To account for these gaps, I have used forward fill to presume no change since the last indicator measure and 0 fill for all the rest. The reason for this choice of back fill is that most of these indicators grew exponentially with time and thus approach zero at earlier times. The daily economics data was matched to the first concert date of each program.
 
-I have engineered some additional features from the data and continue to do so. After some initial linear regression scoring, which has revealed a very low correlation between the number of most frequent composers and CEI data, more relevant features such as those indicating smaller orchestras (eg: keywords of CONCERTO and QUARTET). I will be looking for additional economic data and budgetary information.
+Included in my coding for the economics data are functions to shift the data back in time to represent response time lag and a delta function that create new columns that are the change in an economic indicator over a set time. Treating these as hyper parameters we can see if there is a stronger relationship between economic upturns with unconventionality and how long seasonal programming takes to respond.
 
-# Project Redirect
+I used sklearn's RandomForestClassifier, LogisticRegression, and LinearRegression tools to perform my analyses. Because these are time dependent observations, I used TimeSeriesSplit for my test validation and removed time specific data such as date from the training. For the first two methods, I used the median program unconventionality of the whole NYPhil corpus as the threshold.
 
-The ultimate goal of this project was to evaluate the choices made for the NYPhil based on external economic influences. As such, I am reshaping the data to create a more useful label that evaluates a program by unconventionality of the program works. Penalized are composers and pieces that regularly appear. This processed value will be indexed by date of the first concert for the program. This will be evaluated with exogenous featurized economics data pulled from various sources that will be listed here later once I have chosen the most relevant datasets. Included so far are the NY City and State CEI as previously described but also stock market indices.  
+# Results:
+
+To Be Updated Soon 
