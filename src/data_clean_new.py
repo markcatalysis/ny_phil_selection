@@ -175,16 +175,16 @@ class econ_data(object):
         self.volatility_index=pd.read_csv('../data/VIXCLS.csv')
         self.fedrate=pd.read_csv('../data/FEDFUNDS.csv')
 
-    def isnumber(self, x):
-        '''
-        Input: element
-        Output: mask for that element
-        '''
-        try:
-            float(x)
-            return True
-        except:
-            return False
+    # def isnumber(self, x):
+    #     '''
+    #     Input: element
+    #     Output: mask for that element
+    #     '''
+    #     try:
+    #         float(x)
+    #         return True
+    #     except:
+    #         return False
 
 
     def make_data_matrix(self):
@@ -199,8 +199,10 @@ class econ_data(object):
         self.data_matrix=mergedf
         # self.data_matrix['Days Since Data']=(self.data_matrix['DATE']-self.data_matrix['DATE'].min())/np.timedelta64(1,'D')
         self.data_matrix=self.data_matrix.set_index('DATE')
-        self.data_matrix=self.data_matrix[self.data_matrix.applymap(self.isnumber)].fillna(method='ffill').fillna(0).convert_objects(convert_dates=False, convert_numeric=True)
+        self.data_matrix=self.data_matrix.replace('.', np.nan).apply(pd.to_numeric)
         self.data_matrix=self.data_matrix.drop(['Year'],axis=1)
+# .fillna(method='ffill').fillna(method='bfill')
+# .fillna(0).
 
     def add_delta_columns(self,d):
         '''
@@ -210,15 +212,16 @@ class econ_data(object):
         for column in columns:
             column_name='%s_delta_%s_days' % (column,d)
             self.data_matrix[column_name]=self.data_matrix[column].diff(d)
-            self.data_matrix=self.data_matrix.fillna(method='ffill').fillna(0)
-
+#             self.data_matrix=self.data_matrix.sort_index().fillna(method='ffill').fillna(method='bfill')
+# # fillna(0)
 
     def shift_matrix_data(self,d_shift):
         '''
         Shift back data by days. Only use sparingly so that you don't accidentally overwrite perfectly good data.
         '''
-        self.data_matrix=self.data_matrix.shift(-d_shift, axis=1).fillna(method='ffill').fillna(0)
-
+        self.data_matrix=self.data_matrix.shift(-d_shift, axis=1)
+# .fillna(method='ffill').fillna(method='bfill')
+# fillna(0)
 
 
 class model_fit(object):
@@ -229,7 +232,7 @@ class model_fit(object):
         '''
         self.lr=LinearRegression()
         self.logr=LogisticRegression()
-        self.rf=RandomForestClassifier()
+        self.rf=RandomForestClassifier(n_estimators=50)
         self.scaler=StandardScaler()
         self.tscv=TimeSeriesSplit(n_splits=20)
         self.pca=PCA()
@@ -253,13 +256,14 @@ class model_fit(object):
         reshape relevant X and y data for individual programs and for whole seasons.
         '''
 
-        X_base_df=self.econ.data_matrix
-        y_seasons_df=self.dc.seasons()
-        y_programs_df=self.dc.programs()
+        X_base_df=self.econ.data_matrix.sort_index().fillna(method='ffill').fillna(method='bfill')
+        y_seasons_df=self.dc.seasons().sort_index()
+        y_programs_df=self.dc.programs().sort_index()
         X_dates=X_base_df.index.date
-        self.y_threshold=y_seasons_df['unconventionality_by_season'].median()
-        # ****** code below for seasons specifically *******
 
+        self.y_threshold=y_programs_df['unconventionality_by_program'].median()
+        # ****** code below for seasons specifically *******
+        self.y_threshold=y_seasons_df['unconventionality_by_season'].median()
         for i, date in enumerate(y_seasons_df.index.date):
             if date in X_dates:
                 X_base_df.loc[X_base_df.index.date==date, 'unconventionality']=y_seasons_df['unconventionality_by_season'][i]
@@ -267,6 +271,7 @@ class model_fit(object):
         self.y=self.X.pop('unconventionality')
 
         # # ****** code below for all programs *******
+        # self.y_threshold=y_programs_df['unconventionality_by_program'].median()
         # for i, date in enumerate(y_programs_df.index.date):
         #     if date in X_dates:
         #         X_base_df.loc[X_base_df.index.date==date, 'unconventionality']=y_programs_df['unconventionality_by_program'][i]
@@ -274,21 +279,6 @@ class model_fit(object):
         # self.y=self.X.pop('unconventionality')
 
 
-
-        # below code is available in case i want to switch back to testing for individul programs instead of whole seasons
-        #
-        # X_seasons=X_base_df[X_base_df['unconventionality'].notnull()]
-        # y_seasons=X_seasons.pop('unconventionality')
-        #
-        # reset the base dataframe
-        # run for individual programs
-        #
-        # X_base_df=econ.data_matrix
-        # for i, date in enumerate(y_programs_df.index.date):
-        #     if date in X_dates:
-        #         X_base_df.loc[X_base_df.index.date==date, 'unconventionality']=y_programs_df['unconventionality_by_program'][i]
-        # X_programs=X_base_df[X_base_df['unconventionality'].notnull()]
-        # y_programs=X_programs.pop('unconventionality')
 
     # def standard_confusion_matrix(self, y_true, y_pred):
     #     """Make confusion matrix with format:
@@ -309,27 +299,26 @@ class model_fit(object):
     #     [[tn, fp], [fn, tp]] = confusion_matrix(y_true, y_pred)
     #     return np.array([[tp, fp], [fn, tn]])
 
-    # def linear(self):
-    #     '''Linear Regression'''
-    #     X=self.X
-    #     y=self.y
-    #     X['ones']=np.ones(X.shape[0])
-    #     X=X.reset_index().drop('DATE', axis=1)
-    #     X=self.scaler.fit_transform(X)
-    #     # X_train,X_test,y_train,y_test=train_test_split(X,y)
-    #     # lr=LinearRegression()
-    #     # lr.fit(X_train,y_train)
-    #     # lscore = lr.score(X_test, y_test)
-    #     '''time-series-split instead of shuffle-split'''
-    #
-    #     tscv=TimeSeriesSplit(n_splits=50)
-    #     lscore_list=[]
-    #     for train_index, test_index in self.tscv.split(X):
-    #         X_train, X_test = X[train_index], X[test_index]
-    #         y_train, y_test = y[train_index], y[test_index]
-    #         self.lr.fit(X_train,y_train)
-    #         lscore_list.append(self.lr.score(X_test, y_test))
-    #     return lscore_list
+    def linear(self):
+        '''Linear Regression'''
+        X=self.X
+        y=float(1)/(self.y)
+        X['ones']=np.ones(X.shape[0])
+        X=X.reset_index().drop('DATE', axis=1)
+        X=self.scaler.fit_transform(X)
+        # X_train,X_test,y_train,y_test=train_test_split(X,y)
+        # lr=LinearRegression()
+        # lr.fit(X_train,y_train)
+        # lscore = lr.score(X_test, y_test)
+        '''time-series-split instead of shuffle-split'''
+
+        lscore_list=[]
+        for train_index, test_index in self.tscv.split(X):
+            X_train, X_test = X[train_index], X[test_index]
+            y_train, y_test = y[train_index], y[test_index]
+            self.lr.fit(X_train,y_train)
+            lscore_list.append(self.lr.score(X_test, y_test))
+        return lscore_list
 
     def logistic(self):
         '''Logistic Regression'''

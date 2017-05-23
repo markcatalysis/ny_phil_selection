@@ -8,9 +8,11 @@ from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
 from pprint import pprint
 import cPickle as pickle
+import seaborn as sns
 
-# import os
-# os.chdir('src')
+import os
+os.chdir('src')
+
 run data_clean
 
 state_employment_df=pd.read_excel('../data/ACPSA-DataForADP.xlsx', sheetname=1)
@@ -18,16 +20,39 @@ ny_arts_employment_df=state_employment_df[state_employment_df.where(state_employ
 ny_arts_employment_df.drop(['FIPS, State', 'Industry name'], axis=1)
 ny_arts_employment_df.shape
 
-values_only_df.columns
-y=values_only_df.nyc_cei
+# values_only_df.columns
+y=values_only_df.new_york_state_cei
 X=values_only_df.drop(['Date','nyc_cei_6m', 'nyc_cei', 'new_york_state_cei', 'new_york_state_cei_6m'], axis=1)
 X['ones']=np.ones(X.shape[0])
-X=StandardScaler().fit_transform(X)
-X_train,X_test,y_train,y_test=train_test_split(X,y)
+# pprint(X.columns)
+X_standard=StandardScaler().fit_transform(X)
+X_train,X_test,y_train,y_test=train_test_split(X_standard,y)
 
 lr=LinearRegression()
 lr.fit(X_train,y_train)
 lr.score(X_test,y_test)
+
+lr.coef_[np.argpartition(np.absolute(lr.coef_),-10)[-10:]]
+X.columns[np.argpartition(np.absolute(lr.coef_),-10)[-10:]]
+plt.plot(X['days'],y)
+plt.plot(X['days'],lr.predict(X_standard))
+plt.legend()
+plt.savefig('../presentation/ny_state_cei_with_days')
+plt.show()
+# values_only_df.columns
+# np.max(X['days'])
+
+plt.show()
+plt.savefig('../presentation/nyc_cei_with_days')
+y=values_only_df.new_york_state_cei
+X=values_only_df.drop(['Date','nyc_cei_6m', 'nyc_cei', 'new_york_state_cei', 'new_york_state_cei_6m'], axis=1)
+X['ones']=np.ones(X.shape[0])
+X_standard=StandardScaler().fit_transform(X)
+X_train,X_test,y_train,y_test=train_test_split(X_standard,y)
+lr.score(X_test,y_test)
+
+# with days 0.82042109296942156
+# without days 0.025627018384981715
 
 #[['days','ones']]
 
