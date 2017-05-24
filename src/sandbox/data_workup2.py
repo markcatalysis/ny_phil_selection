@@ -24,14 +24,15 @@ import datetime
 from pprint import pprint
 
 # np.mean(mf.logistic())
-mf=model_fit()
+mf=model_fit(d=28)
 mf.linear()
 mf.logistic()
 # d = 0 (0.64000000000000001, 0.80000000000000004, 0.53333333333333333) with programs
 # d = 0 ((0.82758620689655171, 0.75, 0.92307692307692313) with seasons
 # d = 28 (0.60869565217391297, 0.69999999999999996, 0.53846153846153844)with programs
 # d = 28 (0.83870967741935487, 0.8125, 0.8666666666666667) with seasons
-
+mf.dc.seasons().describe()
+mf.dc.programs().describe()
 # removing feature for days since
 # d=0 d_shift=0 (0.58333333333333337, 0.58333333333333337, 0.58333333333333337)
 # d=21 d_shift=0 (0.54545454545454541, 0.5, 0.59999999999999998)
@@ -51,7 +52,7 @@ mf.logistic()
 # d=365 d_shift=0 (0.71999999999999986, 0.75, 0.69230769230769229)
 # d=730 d_shift=0 (0.66666666666666663, 0.66666666666666663, 0.66666666666666663)
 
-# zip(list(mf.econ.data_matrix.columns), list(mf.logr.coef_[0]))
+zip(list(mf.econ.data_matrix.columns), list(mf.logr.coef_[0]))
 
 mf.randomforest()
 # d=0, programs (0.3529411764705882, 0.29999999999999999, 0.42857142857142855)
@@ -65,6 +66,7 @@ mf.y_threshold
 # d=28 (0.64000000000000001, 0.66666666666666663, 0.61538461538461542)
 # d=60 (0.7857142857142857, 0.91666666666666663, 0.6875) (although it got higher than this on subsequent tries)
 # d=120 (0.61538461538461531, 0.66666666666666663, 0.5714285714285714) (although it got lower, all 0.5 a couple times... clearly i need more trees?)
+
 
 
 # dc=data_clean()
@@ -113,3 +115,6 @@ plt.legend()
 # plt.plot(mf.X.index, mf.X.iloc[:,0], linestyle='None', marker='.')
 plt.savefig('../presentation/Unconventionality_and_NASDAQ.png')
 # plt.show()
+
+
+scatter_matrix(mf.X)
