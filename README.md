@@ -23,4 +23,4 @@ As will be discussed later, the unconventionality by season is a more relevant m
 
 # Results:
 
-To Be Updated Soon
+<!-- ![Image of Yaktocat](https://octodex.github.com/images/yaktocat.png) -->
