@@ -1,107 +1,122 @@
 from pandas.tools.plotting import scatter_matrix
+# import matplotlib.pyplot as plt
+# from sklearn.model_selection import train_test_split
+# from sklearn.ensemble import RandomForestClassifier
+# from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LinearRegression
-import matplotlib.pyplot as plt
-from sklearn.cluster import DBSCAN
-from sklearn.preprocessing import StandardScaler
-from pprint import pprint
-import cPickle as pickle
 import seaborn as sns
-
+# from sklearn.cluster import DBSCAN
+# from sklearn.preprocessing import StandardScaler
+# from pprint import pprint
+# import cPickle as pickle
 import os
-os.chdir('src')
+# os.getcwd()
+# os.chdir('../../capstone/src')
 
-run data_clean
+import numpy as np
+import pandas as pd
+from data_clean import data_clean
+from data_clean import econ_data
+from data_clean import model_fit
+from sklearn.decomposition import PCA
+from sklearn.decomposition import NMF
+from sklearn.preprocessing import StandardScaler
+import datetime
+from pprint import pprint
 
-state_employment_df=pd.read_excel('../data/ACPSA-DataForADP.xlsx', sheetname=1)
-ny_arts_employment_df=state_employment_df[state_employment_df.where(state_employment_df['FIPS, State']=='36 New York')['Industry code'].isin([34, 35, 36])]
-ny_arts_employment_df.drop(['FIPS, State', 'Industry name'], axis=1)
-ny_arts_employment_df.shape
+# np.mean(mf.logistic())
+mf=model_fit(d=28, d_shift=28, drop_original=True)
+# mf.X
+mf.linear()
+mf.logistic()
+# d = 0 (0.64000000000000001, 0.80000000000000004, 0.53333333333333333) with programs
+# d = 0 ((0.82758620689655171, 0.75, 0.92307692307692313) with seasons
+# d = 28 (0.60869565217391297, 0.69999999999999996, 0.53846153846153844)with programs
+# d = 28 (0.83870967741935487, 0.8125, 0.8666666666666667) with seasons
+mf.dc.seasons().describe()
+mf.dc.programs().describe()
+# removing feature for days since
+# d=0 d_shift=0 (0.58333333333333337, 0.58333333333333337, 0.58333333333333337)
+# d=21 d_shift=0 (0.54545454545454541, 0.5, 0.59999999999999998)
+# d=28, d_shift=0 (0.66666666666666663, 0.66666666666666663, 0.66666666666666663)
+# d=60, d_shift=0 (0.60869565217391308, 0.58333333333333337, 0.63636363636363635)
+# d=120 (0.66666666666666663, 0.66666666666666663, 0.66666666666666663)
+# d=180 (0.58333333333333337, 0.58333333333333337, 0.58333333333333337)
+# d=360 (0.52173913043478259, 0.5, 0.54545454545454541)
 
-# values_only_df.columns
-y=values_only_df.new_york_state_cei
-X=values_only_df.drop(['Date','nyc_cei_6m', 'nyc_cei', 'new_york_state_cei', 'new_york_state_cei_6m'], axis=1)
-X['ones']=np.ones(X.shape[0])
-# pprint(X.columns)
-X_standard=StandardScaler().fit_transform(X)
-X_train,X_test,y_train,y_test=train_test_split(X_standard,y)
+# all features
+# d=0 d_shift=0 (0.71999999999999986, 0.75, 0.69230769230769229)
+# d=21 d_shift=0 (0.66666666666666663, 0.58333333333333337, 0.77777777777777779)
+# d=28 d_shift=0 (0.75, 0.75, 0.75)
+# d=60 d_shift=0 (0.80000000000000004, 0.83333333333333337, 0.76923076923076927)
+# d=120 d_shift=0 (0.75, 0.75, 0.75)
+# d=180 d_shift=0 (0.60869565217391308, 0.58333333333333337, 0.63636363636363635)
+# d=365 d_shift=0 (0.71999999999999986, 0.75, 0.69230769230769229)
+# d=730 d_shift=0 (0.66666666666666663, 0.66666666666666663, 0.66666666666666663)
 
-lr=LinearRegression()
-lr.fit(X_train,y_train)
-lr.score(X_test,y_test)
+zip(list(mf.econ.data_matrix.columns), list(mf.logr.coef_[0]))
 
-lr.coef_[np.argpartition(np.absolute(lr.coef_),-10)[-10:]]
-X.columns[np.argpartition(np.absolute(lr.coef_),-10)[-10:]]
-plt.plot(X['days'],y)
-plt.plot(X['days'],lr.predict(X_standard))
+mf.randomforest()
+# d=0, programs (0.3529411764705882, 0.29999999999999999, 0.42857142857142855)
+# d=0, seasons (0.61538461538461542, 0.5, 0.80000000000000004)
+# d=28 days, programs (0.58823529411764697, 0.5, 0.7142857142857143)
+# d=28 days, seasons (0.7142857142857143, 0.625, 0.83333333333333337)
+
+np.sum(mf.y>mf.y_threshold)/float(len(mf.y))
+mf.y_threshold
+#removed days
+# d=28 (0.64000000000000001, 0.66666666666666663, 0.61538461538461542)
+# d=60 (0.7857142857142857, 0.91666666666666663, 0.6875) (although it got higher than this on subsequent tries)
+# d=120 (0.61538461538461531, 0.66666666666666663, 0.5714285714285714) (although it got lower, all 0.5 a couple times... clearly i need more trees?)
+
+
+
+# dc=data_clean()
+# dc.run()
+# dc.seasons().columns[0]
+
+# econ=econ_data()
+# econ.load_econ_data()
+# econ.make_data_matrix()
+# columns_1=econ.data_matrix.columns
+# pprint(zip(range(len(columns_1)),list(columns_1)))
+# X_base_df=econ.data_matrix
+# y_seasons_df=dc.seasons()
+# y_programs_df=dc.programs()
+# X_dates=X_base_df.index.date
+# y_seasons_df.index.date
+
+
+pca=PCA()
+pca.fit(StandardScaler().fit_transform(mf.X), mf.y)
+pca.components_
+pca.explained_variance_
+
+
+nmf=NMF()
+nmf.fit(mf.X[mf.X>=0], mf.y)
+nmf.components_
+nmf.reconstruction_err_
+
+
+# X.reset_index().drop('DATE', axis=1)
+
+# for i, date in enumerate(y_seasons_df.index.date):
+#     if date in X_dates:
+#         X_base_df.loc[X_base_df.index.date==date, 'unconventionality']=y_seasons_df['unconventionality_by_season'][i]
+# X_seasons=X_base_df[X_base_df['unconventionality'].notnull()]
+# y_seasons=X_seasons.pop('unconventionality')
+# y_seasons
+mf.X.columns
+x_for_plot=mf.y.index
+plt.plot(x_for_plot, mf.scaler.fit_transform(mf.y), marker='.', label='Unconventionality')
+plt.plot(x_for_plot, mf.scaler.fit_transform(mf.X.iloc[:,0]), marker='o', label='NASDAQ')
+plt.xlabel('Years')
+plt.ylabel('Normalized Units')
 plt.legend()
-plt.savefig('../presentation/ny_state_cei_with_days')
-plt.show()
-# values_only_df.columns
-# np.max(X['days'])
-
-plt.show()
-plt.savefig('../presentation/nyc_cei_with_days')
-y=values_only_df.new_york_state_cei
-X=values_only_df.drop(['Date','nyc_cei_6m', 'nyc_cei', 'new_york_state_cei', 'new_york_state_cei_6m'], axis=1)
-X['ones']=np.ones(X.shape[0])
-X_standard=StandardScaler().fit_transform(X)
-X_train,X_test,y_train,y_test=train_test_split(X_standard,y)
-lr.score(X_test,y_test)
-
-# with days 0.82042109296942156
-# without days 0.025627018384981715
-
-#[['days','ones']]
-
-#score to beat
-#with n=10
-#nyc_cei base score only time and ones 0.82170387012973989
-# current with all features: 0.82243052902996461
-#nyc_cei_6m 0.81709142238659505
-# current with all features: 0.81792110542641727
-
-#updated scores to beat
-#with n=50 and composer count commented out
-#nyc_cei base score only time and ones 0.81877982143582251
-#nyc_cei with all features: 0.82327963441095975
-
-'''
-New high score... yay...
-'''
-
-#MORE play counts added
-#baseline with no features: 0.81878244937070133
-#added features: 0.82234015735596777
-#FUDGE MONKEY not much there but hey more features. Let's get to finding latent features.
+# plt.plot(mf.X.index, mf.X.iloc[:,0], linestyle='None', marker='.')
+plt.savefig('../presentation/Unconventionality_and_NASDAQ.png')
+# plt.show()
 
 
-'''
-Implementing hierarchal-like clustering to identify commonly played pieces.
-'''
-
-debra=DBSCAN(eps=0.2, algorithm='brute', metric='cosine')
-debra.fit(X)
-
-core_samples_mask = np.zeros_like(debra.labels_, dtype=bool)
-core_samples_mask[debra.core_sample_indices_] = True
-labels = debra.labels_
-labels
-# Number of clusters in labels, ignoring noise if present.
-n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
-
-print('Estimated number of clusters: %d' % n_clusters_)
-
-# pprint(values_only_df.drop(['Date','nyc_cei_6m', 'nyc_cei', 'new_york_state_cei', 'new_york_state_cei_6m'], axis=1).iloc[labels==2])
-
-'''Fascinating... with eps=0.5, there are only 3 clusters, one super cluser and two smaller ones. The programs labeled 2 in this clustering have 0 values all across the board. Nothing appears in the most common composers or pieces. Those labeled 1 have a higher percentage of small ensemble pieces but low overlap with the other more common composers. Interesting. Checking what the works are for the programs in cluster 2.'''
-
-program_concerts_df['works'].iloc[labels==2]
-
-'''All of the ones with label == 2 are Handel's Messiah! Excellent... I'm pickle those results. Although I could probably search for them to recreate the indices, I find this to be an amusing list that could be of use later.'''
-
-handels_labels=labels==2
-with open('Messiah.csv', 'w') as f:
-    pickle.dumps(handels_labels)
+scatter_matrix(mf.X)
