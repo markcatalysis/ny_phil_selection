@@ -23,5 +23,19 @@ As will be discussed later, the unconventionality by season is a more relevant m
 
 # Results:
 
+Borrowing images from my capstone presentation for this project, we can see unconventionality varies greatly across  both programs and seasons. From the figure below, in both cases, the median is significantly smaller than the mean implying that the majority of performances were highly conventional largely composed of the same pieces by the same composers. This separation of programs speaks to the benefit of choosing this particular metric for unconventionality which allows for easy detection of less frequently performed works.
 
-<!-- ![Image of Yaktocat](https://octodex.github.com/images/yaktocat.png) -->
+<!-- ![Unconventionality Definition and Basic Statistics](https://github.com/markcatalysis/ny_phil_selection/blob/master/presentation/2017-06-06%20(2).png) -->
+Figure 1. Unconventionality across programs and seasons at a glance. Seasons largely smooth out unconventionality as would be expected from averaging across multiple programs but still the unconventionality value still captures similar choice behavior by conductors - highly conventional pieces that meet crowd expectations across most programs being the norm.   
+
+By taking a look across across some of the chosen indicators and comparing them to unconventionality over time we can see that these fluctuations do not directly correspond to the degree of unconventionality seen over time, but there may be some correlation and a time delay that may suggest a delayed response in unconventionality to changes in economic health. Instead of a direct linear regression method, we will instead seek to detect high conventionality as defined by a program or season being above the median for all programs and seasons, respectively.  
+
+<!-- ![An Example Indicator, the NASDAQ, and Season Unconventionality with Time](https://github.com/markcatalysis/ny_phil_selection/blob/master/presentation/2017-06-06%20(5).png) -->
+Figure 2. NASDAQ and unconventionality by season over time.  
+
+If we are to run our models and include both time delay and deltas in indicators over time, we find improved performance across various score metrics compared to the base model by adding time dependence. In every model I ran with added features corresponding to responses in time spanning 28 days to 6 months, I found increased predictive power in the models even with dropping the initial featurized data to mitigate naively overfitting to noise captured in added features. In particular, the best performing model for both logistic regression and random forest classification used were those with the added deltas over 28 days.
+
+<!-- ![Model Performance](https://github.com/markcatalysis/ny_phil_selection/blob/master/presentation/2017-06-06%20(6).png) -->
+Figure 3. Table of scores across various models.
+
+One should note that predicting unconventionality over seasons largely improved predictive power. This makes intuitive sense in that programs are largely decided at the beginning of a season, so there is some room for variation within a season but the amount of conventionality for a whole season is set at the beginning. Additionally, the timing of the programming decisions necessitates that when a given program is performed is largely decoupled from the economic indicators at the time of performance but rather are better associated with those at the beginning of the season and thus are poorly described by the indicator values of the particular concert dates of that program. 
