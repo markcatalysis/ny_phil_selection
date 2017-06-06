@@ -25,16 +25,16 @@ import datetime
 from pprint import pprint
 
 # np.mean(mf.logistic())
-mf=model_fit(d=28, d_shift=28, drop_original=True)
-# mf.X
+mf=model_fit(d=60, d_shift=0, drop_original=True)
+mf.X
 mf.linear()
 mf.logistic()
 # d = 0 (0.64000000000000001, 0.80000000000000004, 0.53333333333333333) with programs
 # d = 0 ((0.82758620689655171, 0.75, 0.92307692307692313) with seasons
 # d = 28 (0.60869565217391297, 0.69999999999999996, 0.53846153846153844)with programs
 # d = 28 (0.83870967741935487, 0.8125, 0.8666666666666667) with seasons
-mf.dc.seasons().describe()
-mf.dc.programs().describe()
+# mf.dc.seasons().describe()
+# mf.dc.programs().describe()
 # removing feature for days since
 # d=0 d_shift=0 (0.58333333333333337, 0.58333333333333337, 0.58333333333333337)
 # d=21 d_shift=0 (0.54545454545454541, 0.5, 0.59999999999999998)

@@ -215,8 +215,6 @@ class econ_data(object):
         for column in columns:
             column_name='%s_delta_%s_days' % (column,d)
             self.data_matrix[column_name]=self.data_matrix[column].diff(d)
-#             self.data_matrix=self.data_matrix.sort_index().fillna(method='ffill').fillna(method='bfill')
-# # fillna(0)
 
     def shift_matrix_data(self,d_shift):
         '''
@@ -226,10 +224,7 @@ class econ_data(object):
         for column in columns:
             column_name='%s_shift_%s_days' % (column,d_shift)
             self.data_matrix[column_name]=self.data_matrix[column].copy()
-            self.data_matrix[column_name].shift(d_shift)
-#         self.data_matrix=self.data_matrix.shift(d_shift, axis=1)
-# .fillna(method='ffill').fillna(method='bfill')
-# fillna(0)
+            self.data_matrix[column_name]=self.data_matrix[column_name].shift(d_shift)
 
 
 class model_fit(object):
@@ -266,7 +261,7 @@ class model_fit(object):
         reshape relevant X and y data for individual programs and for whole seasons.
         '''
 
-        X_base_df=self.econ.data_matrix.sort_index().fillna(method='ffill').fillna(method='bfill')
+        X_base_df=self.econ.data_matrix.sort_index().fillna(method='ffill').fillna(method='bfill').fillna(0)
         y_seasons_df=self.dc.seasons().sort_index()
         y_programs_df=self.dc.programs().sort_index()
         X_dates=X_base_df.index.date
